@@ -273,6 +273,16 @@
             transform: translateY(-2px);
         }
         
+        .btn-delete {
+            background-color: var(--danger-color);
+            color: white;
+        }
+        
+        .btn-delete:hover {
+            background-color: #e01e72;
+            transform: translateY(-2px);
+        }
+        
         .btn-outline {
             background-color: transparent;
             border: 2px solid var(--primary-color);
@@ -344,6 +354,9 @@
             background-color: white;
             transition: background-color 0.2s;
             min-width: 120px;
+            position: relative;
+            cursor: cell;
+            user-select: none;
         }
         
         #excelTable tr:nth-child(even) td {
@@ -358,6 +371,17 @@
             outline: 2px solid var(--primary-color);
             background-color: #e6f7ff;
             box-shadow: inset 0 0 5px rgba(67, 97, 238, 0.2);
+        }
+        
+        /* Selected Cells */
+        #excelTable td.selected {
+            background-color: #b3e0ff !important;
+            border: 2px solid var(--primary-color) !important;
+        }
+        
+        #excelTable td.selected-range {
+            background-color: #d9edf7 !important;
+            border: 1px solid #5bc0de !important;
         }
         
         /* Footer */
@@ -526,6 +550,19 @@
             50% { opacity: 0.6; }
             100% { opacity: 1; }
         }
+        
+        /* Selection Info */
+        .selection-info {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 15px;
+            font-size: 0.9rem;
+            color: #666;
+            background: #f0f0f0;
+            padding: 4px 10px;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
@@ -561,9 +598,13 @@
                 <div class="status">
                     <i class="fas fa-info-circle"></i>
                     <span id="statusText">Loading default data.csv file...</span>
-                    <span id="saveIndicator" class="save-indicator" style="display: none;">
+                    <span id="saveIndicator" class="save-indicator">
                         <i class="fas fa-circle unsaved-changes"></i>
                         <span>Unsaved changes</span>
+                    </span>
+                    <span id="selectionInfo" class="selection-info" style="display: none;">
+                        <i class="fas fa-mouse-pointer"></i>
+                        <span>0 cells selected</span>
                     </span>
                 </div>
                 <div class="file-info">
@@ -586,9 +627,13 @@
                         <i class="fas fa-plus"></i>
                         Add Column
                     </button>
-                    <button id="saveCsvBtn" class="btn btn-save" onclick="saveToDataCSV()" style="display: none;">
+                    <button id="saveCsvBtn" class="btn btn-save" onclick="saveToDataCSV()">
                         <i class="fas fa-save"></i>
                         Save to data.csv
+                    </button>
+                    <button class="btn btn-delete" onclick="deleteSelectedCells()">
+                        <i class="fas fa-trash"></i>
+                        Delete Selected
                     </button>
                 </div>
                 
@@ -633,6 +678,9 @@
         let currentFileName = 'data.csv';
         let isDefaultFile = true;
         let hasUnsavedChanges = false;
+        let selectedCells = new Set();
+        let isSelecting = false;
+        let selectionStart = null;
         
         // Load data.csv by default when page loads
         document.addEventListener('DOMContentLoaded', function() {
@@ -664,16 +712,37 @@
                     handleFileSelect({ target: { files: e.dataTransfer.files } });
                 }
             });
+            
+            // Add keyboard shortcuts
+            document.addEventListener('keydown', function(e) {
+                // Ctrl+A to select all cells
+                if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                    e.preventDefault();
+                    selectAllCells();
+                }
+                // Delete key to clear selected cells
+                if (e.key === 'Delete' || e.key === 'Backspace') {
+                    if (selectedCells.size > 0) {
+                        e.preventDefault();
+                        deleteSelectedCells();
+                    }
+                }
+                // Escape to clear selection
+                if (e.key === 'Escape') {
+                    clearSelection();
+                }
+            });
         });
         
         // Load default data.csv file
         function loadDefaultData() {
             document.getElementById('statusText').textContent = 'Loading default data.csv file...';
             document.getElementById('fileName').textContent = 'data.csv (default)';
-            document.getElementById('saveCsvBtn').style.display = 'none';
             document.getElementById('saveIndicator').style.display = 'none';
+            document.getElementById('selectionInfo').style.display = 'none';
             hasUnsavedChanges = false;
             isDefaultFile = true;
+            selectedCells.clear();
             
             fetch('data.csv')
                 .then(response => {
@@ -765,12 +834,20 @@
             if (!file) return;
             
             currentFileName = file.name;
-            isDefaultFile = currentFileName === 'data.csv';
+            isDefaultFile = currentFileName.toLowerCase() === 'data.csv';
             document.getElementById('fileName').textContent = currentFileName;
             document.getElementById('statusBar').style.display = 'flex';
-            document.getElementById('saveCsvBtn').style.display = isDefaultFile ? 'flex' : 'none';
             document.getElementById('saveIndicator').style.display = 'none';
+            document.getElementById('selectionInfo').style.display = 'none';
             hasUnsavedChanges = false;
+            selectedCells.clear();
+            
+            // Show/hide save button based on file name
+            if (isDefaultFile) {
+                document.getElementById('saveCsvBtn').style.display = 'flex';
+            } else {
+                document.getElementById('saveCsvBtn').style.display = 'none';
+            }
             
             showToast(`Loading ${file.name}...`, 'info');
             
@@ -791,10 +868,6 @@
                     document.getElementById('excelTable').style.display = 'table';
                     document.getElementById('statusText').textContent = 'Ready to edit';
                     
-                    // Show save button if this is data.csv
-                    if (isDefaultFile) {
-                        document.getElementById('saveCsvBtn').style.display = 'flex';
-                    }
                 } catch (error) {
                     showToast(`Error loading file: ${error.message}`, 'error');
                     console.error(error);
@@ -822,6 +895,7 @@
         // Change active sheet
         function changeSheet() {
             currentSheetName = document.getElementById('sheetDropdown').value;
+            clearSelection();
             renderTable(currentSheetName);
             showToast(`Switched to sheet: ${currentSheetName}`, 'info');
         }
@@ -840,6 +914,15 @@
             const headerRow = document.createElement('tr');
             const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
             
+            // Add empty header for selection column
+            const selectAllHeader = document.createElement('th');
+            selectAllHeader.innerHTML = '<i class="fas fa-mouse-pointer"></i>';
+            selectAllHeader.style.width = '40px';
+            selectAllHeader.style.textAlign = 'center';
+            selectAllHeader.title = 'Click to select all';
+            selectAllHeader.onclick = selectAllCells;
+            headerRow.appendChild(selectAllHeader);
+            
             // Add column headers
             for (let C = 0; C <= range.e.c; C++) {
                 const colHeader = document.createElement('th');
@@ -853,65 +936,29 @@
             jsonData.forEach((row, rowIndex) => {
                 const tr = document.createElement('tr');
                 
+                // Add row selection cell
+                const rowSelectCell = document.createElement('td');
+                rowSelectCell.innerHTML = '<i class="fas fa-grip-lines"></i>';
+                rowSelectCell.style.textAlign = 'center';
+                rowSelectCell.style.cursor = 'pointer';
+                rowSelectCell.style.backgroundColor = '#f8f9fa';
+                rowSelectCell.title = 'Click to select entire row';
+                rowSelectCell.onclick = (e) => {
+                    e.stopPropagation();
+                    selectRow(rowIndex);
+                };
+                tr.appendChild(rowSelectCell);
+                
                 // Add data cells
                 for (let colIndex = 0; colIndex < row.length; colIndex++) {
-                    const td = document.createElement('td');
-                    td.contentEditable = true;
-                    td.textContent = row[colIndex];
-                    
-                    // Update cell value when edited
-                    td.addEventListener('focus', function() {
-                        this.classList.add('cell-editing');
-                        this.oldValue = this.textContent;
-                    });
-                    
-                    td.addEventListener('blur', function() {
-                        this.classList.remove('cell-editing');
-                        if (this.textContent !== this.oldValue) {
-                            updateCellValue(rowIndex, colIndex, this.textContent);
-                            markUnsavedChanges();
-                        }
-                    });
-                    
-                    // Handle Enter key to move to next cell
-                    td.addEventListener('keydown', function(e) {
-                        if (e.key === 'Enter') {
-                            e.preventDefault();
-                            this.blur();
-                            const nextRow = this.parentElement.nextElementSibling;
-                            if (nextRow) {
-                                const cells = nextRow.querySelectorAll('td');
-                                if (cells.length > colIndex) {
-                                    cells[colIndex].focus();
-                                }
-                            }
-                        }
-                    });
-                    
+                    const td = createTableCell(rowIndex, colIndex, row[colIndex]);
                     tr.appendChild(td);
                 }
                 
                 // Add empty cells if row is shorter than the longest row
                 const expectedCells = range.e.c + 1;
-                while (tr.children.length < expectedCells) {
-                    const td = document.createElement('td');
-                    td.contentEditable = true;
-                    
-                    td.addEventListener('focus', function() {
-                        this.classList.add('cell-editing');
-                        this.oldValue = this.textContent;
-                    });
-                    
-                    td.addEventListener('blur', function() {
-                        this.classList.remove('cell-editing');
-                        const actualRowIndex = Array.from(tr.parentNode.children).indexOf(tr);
-                        const actualColIndex = Array.from(tr.children).indexOf(td);
-                        if (this.textContent !== this.oldValue) {
-                            updateCellValue(actualRowIndex, actualColIndex, this.textContent);
-                            markUnsavedChanges();
-                        }
-                    });
-                    
+                while (tr.children.length < expectedCells + 1) { // +1 for row selector
+                    const td = createTableCell(rowIndex, tr.children.length - 1, '');
                     tr.appendChild(td);
                 }
                 
@@ -924,32 +971,223 @@
                 const tr = document.createElement('tr');
                 const rowIndex = table.children.length - 1;
                 
+                // Add row selection cell
+                const rowSelectCell = document.createElement('td');
+                rowSelectCell.innerHTML = '<i class="fas fa-grip-lines"></i>';
+                rowSelectCell.style.textAlign = 'center';
+                rowSelectCell.style.cursor = 'pointer';
+                rowSelectCell.style.backgroundColor = '#f8f9fa';
+                rowSelectCell.title = 'Click to select entire row';
+                rowSelectCell.onclick = (e) => {
+                    e.stopPropagation();
+                    selectRow(rowIndex - 1);
+                };
+                tr.appendChild(rowSelectCell);
+                
                 // Add empty cells
                 for (let colIndex = 0; colIndex < range.e.c + 1; colIndex++) {
-                    const td = document.createElement('td');
-                    td.contentEditable = true;
-                    
-                    td.addEventListener('focus', function() {
-                        this.classList.add('cell-editing');
-                        this.oldValue = this.textContent;
-                    });
-                    
-                    td.addEventListener('blur', function() {
-                        this.classList.remove('cell-editing');
-                        const actualRowIndex = Array.from(tr.parentNode.children).indexOf(tr) - 1; // -1 for header
-                        const actualColIndex = Array.from(tr.children).indexOf(td);
-                        if (this.textContent !== this.oldValue) {
-                            updateCellValue(actualRowIndex, actualColIndex, this.textContent);
-                            markUnsavedChanges();
-                        }
-                    });
-                    
+                    const td = createTableCell(rowIndex - 1, colIndex, '');
                     tr.appendChild(td);
                 }
                 table.appendChild(tr);
             }
             
             table.style.display = 'table';
+        }
+        
+        // Create a table cell with selection functionality
+        function createTableCell(row, col, value) {
+            const td = document.createElement('td');
+            td.contentEditable = true;
+            td.textContent = value;
+            td.dataset.row = row;
+            td.dataset.col = col;
+            
+            // Cell selection
+            td.addEventListener('mousedown', function(e) {
+                if (e.shiftKey && selectionStart) {
+                    // Range selection
+                    const startRow = Math.min(selectionStart.row, row);
+                    const endRow = Math.max(selectionStart.row, row);
+                    const startCol = Math.min(selectionStart.col, col);
+                    const endCol = Math.max(selectionStart.col, col);
+                    
+                    clearSelection();
+                    
+                    for (let r = startRow; r <= endRow; r++) {
+                        for (let c = startCol; c <= endCol; c++) {
+                            const cellId = `${r}-${c}`;
+                            selectedCells.add(cellId);
+                            const cell = findCell(r, c);
+                            if (cell) {
+                                cell.classList.add('selected-range');
+                            }
+                        }
+                    }
+                    updateSelectionInfo();
+                } else if (e.ctrlKey || e.metaKey) {
+                    // Add to selection
+                    e.preventDefault();
+                    const cellId = `${row}-${col}`;
+                    if (selectedCells.has(cellId)) {
+                        selectedCells.delete(cellId);
+                        this.classList.remove('selected');
+                    } else {
+                        selectedCells.add(cellId);
+                        this.classList.add('selected');
+                        selectionStart = {row, col};
+                    }
+                    updateSelectionInfo();
+                } else {
+                    // Single selection
+                    clearSelection();
+                    selectedCells.add(`${row}-${col}`);
+                    this.classList.add('selected');
+                    selectionStart = {row, col};
+                    updateSelectionInfo();
+                }
+            });
+            
+            // Update cell value when edited
+            td.addEventListener('focus', function() {
+                this.classList.add('cell-editing');
+                this.oldValue = this.textContent;
+            });
+            
+            td.addEventListener('blur', function() {
+                this.classList.remove('cell-editing');
+                if (this.textContent !== this.oldValue) {
+                    updateCellValue(row, col, this.textContent);
+                    markUnsavedChanges();
+                }
+            });
+            
+            // Handle Enter key to move to next cell
+            td.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.blur();
+                    const nextRow = this.parentElement.nextElementSibling;
+                    if (nextRow) {
+                        const cells = nextRow.querySelectorAll('td');
+                        if (cells.length > col + 1) { // +1 for row selector
+                            cells[col + 1].focus();
+                        }
+                    }
+                }
+            });
+            
+            return td;
+        }
+        
+        // Find cell by row and column
+        function findCell(row, col) {
+            const table = document.getElementById('excelTable');
+            const rows = table.querySelectorAll('tr');
+            // Skip header row (index 0)
+            if (row + 1 < rows.length) {
+                const cells = rows[row + 1].querySelectorAll('td');
+                // Skip row selector cell (index 0)
+                if (col + 1 < cells.length) {
+                    return cells[col + 1];
+                }
+            }
+            return null;
+        }
+        
+        // Select all cells
+        function selectAllCells() {
+            if (!workbook) return;
+            
+            const worksheet = workbook.Sheets[currentSheetName];
+            const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+            
+            clearSelection();
+            
+            for (let r = 0; r <= range.e.r; r++) {
+                for (let c = 0; c <= range.e.c; c++) {
+                    const cellId = `${r}-${c}`;
+                    selectedCells.add(cellId);
+                    const cell = findCell(r, c);
+                    if (cell) {
+                        cell.classList.add('selected-range');
+                    }
+                }
+            }
+            updateSelectionInfo();
+            showToast(`Selected ${selectedCells.size} cells`, 'info');
+        }
+        
+        // Select entire row
+        function selectRow(rowIndex) {
+            if (!workbook) return;
+            
+            const worksheet = workbook.Sheets[currentSheetName];
+            const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+            
+            clearSelection();
+            
+            for (let c = 0; c <= range.e.c; c++) {
+                const cellId = `${rowIndex}-${c}`;
+                selectedCells.add(cellId);
+                const cell = findCell(rowIndex, c);
+                if (cell) {
+                    cell.classList.add('selected-range');
+                }
+            }
+            updateSelectionInfo();
+            showToast(`Selected row ${rowIndex + 1}`, 'info');
+        }
+        
+        // Clear all selections
+        function clearSelection() {
+            selectedCells.clear();
+            const table = document.getElementById('excelTable');
+            if (table) {
+                const cells = table.querySelectorAll('td.selected, td.selected-range');
+                cells.forEach(cell => {
+                    cell.classList.remove('selected', 'selected-range');
+                });
+            }
+            updateSelectionInfo();
+        }
+        
+        // Update selection info display
+        function updateSelectionInfo() {
+            const selectionInfo = document.getElementById('selectionInfo');
+            if (selectedCells.size > 0) {
+                selectionInfo.style.display = 'flex';
+                selectionInfo.querySelector('span').textContent = `${selectedCells.size} cell${selectedCells.size !== 1 ? 's' : ''} selected`;
+            } else {
+                selectionInfo.style.display = 'none';
+            }
+        }
+        
+        // Delete selected cells content
+        function deleteSelectedCells() {
+            if (selectedCells.size === 0) {
+                showToast('No cells selected', 'warning');
+                return;
+            }
+            
+            if (!confirm(`Clear content of ${selectedCells.size} selected cell${selectedCells.size !== 1 ? 's' : ''}?`)) {
+                return;
+            }
+            
+            selectedCells.forEach(cellId => {
+                const [row, col] = cellId.split('-').map(Number);
+                updateCellValue(row, col, '');
+                const cell = findCell(row, col);
+                if (cell) {
+                    cell.textContent = '';
+                    cell.classList.remove('selected', 'selected-range');
+                }
+            });
+            
+            selectedCells.clear();
+            updateSelectionInfo();
+            markUnsavedChanges();
+            showToast(`Cleared ${selectedCells.size} cells`, 'success');
         }
         
         // Update cell value in the workbook
@@ -975,7 +1213,6 @@
             if (isDefaultFile && !hasUnsavedChanges) {
                 hasUnsavedChanges = true;
                 document.getElementById('saveIndicator').style.display = 'flex';
-                document.getElementById('saveCsvBtn').innerHTML = '<i class="fas fa-save"></i> Save to data.csv';
             }
         }
         
@@ -1056,6 +1293,7 @@
             worksheet['!ref'] = XLSX.utils.encode_range(range);
             
             // Re-render the table
+            clearSelection();
             renderTable(currentSheetName);
             markUnsavedChanges();
             showToast('New row added', 'success');
@@ -1082,6 +1320,7 @@
             worksheet['!ref'] = XLSX.utils.encode_range(range);
             
             // Re-render the table
+            clearSelection();
             renderTable(currentSheetName);
             markUnsavedChanges();
             showToast('New column added', 'success');
@@ -1187,14 +1426,22 @@
         function showInstructions() {
             const instructions = `
             <h3>Excel File Editor - Instructions</h3>
-            <p><strong>1. Default Loading:</strong> The editor automatically loads data.csv when you open the page</p>
-            <p><strong>2. Edit & Save:</strong> When editing data.csv, a "Save to data.csv" button appears</p>
-            <p><strong>3. Unsaved Changes:</strong> A red dot indicates unsaved changes to data.csv</p>
-            <p><strong>4. Upload a File:</strong> Click the upload area or button to select other Excel files</p>
-            <p><strong>5. Edit Cells:</strong> Click on any cell to edit its content</p>
-            <p><strong>6. Add Rows/Columns:</strong> Use the buttons in the toolbar to add rows or columns</p>
-            <p><strong>7. Download:</strong> Click the download button to save your edited file as .xlsx</p>
-            <p><strong>8. Save data.csv:</strong> When editing data.csv, click "Save to data.csv" to download your changes</p>
+            <p><strong>Cell Selection:</strong></p>
+            <p>• <strong>Single click:</strong> Select one cell</p>
+            <p>• <strong>Ctrl+Click:</strong> Add/remove cells from selection</p>
+            <p>• <strong>Shift+Click:</strong> Select range of cells</p>
+            <p>• <strong>Click row icon:</strong> Select entire row</p>
+            <p>• <strong>Click header icon:</strong> Select all cells</p>
+            <p>• <strong>Ctrl+A:</strong> Select all cells</p>
+            <p>• <strong>Delete key:</strong> Clear selected cells</p>
+            <p>• <strong>Escape:</strong> Clear selection</p>
+            <p><strong>Editing:</strong></p>
+            <p>• Click any cell to edit its content</p>
+            <p>• Press Enter to move to next cell</p>
+            <p><strong>File Operations:</strong></p>
+            <p>• "Save to data.csv" appears when editing data.csv</p>
+            <p>• Red dot indicates unsaved changes</p>
+            <p>• "Delete Selected" clears content of selected cells</p>
             <p><strong>Note:</strong> All editing happens in your browser - no data is sent to any server</p>
             `;
             
