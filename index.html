@@ -14,12 +14,15 @@
             --success-color: #4cc9f0;
             --danger-color: #f72585;
             --warning-color: #ff9e00;
+            --save-color: #2ecc71;
+            --save-dark: #27ae60;
             --light-color: #f8f9fa;
             --dark-color: #212529;
             --border-color: #dee2e6;
             --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
             --shadow-hover: 0 8px 30px rgba(0, 0, 0, 0.12);
             --gradient-primary: linear-gradient(135deg, #4361ee, #3a0ca3);
+            --gradient-save: linear-gradient(135deg, #2ecc71, #27ae60);
         }
         
         * {
@@ -247,6 +250,16 @@
         
         .btn-success:hover {
             background-color: #3bb4d8;
+            transform: translateY(-2px);
+        }
+        
+        .btn-save {
+            background: var(--gradient-save);
+            color: white;
+        }
+        
+        .btn-save:hover {
+            background: linear-gradient(135deg, #27ae60, #219653);
             transform: translateY(-2px);
         }
         
@@ -491,6 +504,28 @@
         .main-card {
             animation: fadeIn 0.5s ease-out;
         }
+        
+        /* Save Indicator */
+        .save-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-left: 10px;
+            font-size: 0.9rem;
+            color: var(--save-color);
+            font-weight: 500;
+        }
+        
+        .unsaved-changes {
+            color: var(--warning-color);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -500,7 +535,7 @@
                 <i class="fas fa-file-excel logo-icon"></i>
             </div>
             <h1>Excel File Editor</h1>
-            <p class="subtitle">Upload an Excel file to view and edit it. Supports .xlsx, .xls, and .csv formats.</p>
+            <p class="subtitle">Upload an Excel file to view and edit it. Supports .xlsx, .xls, and .csv formats. Edit and save data.csv directly!</p>
         </header>
         
         <!-- Main Card -->
@@ -526,6 +561,10 @@
                 <div class="status">
                     <i class="fas fa-info-circle"></i>
                     <span id="statusText">Loading default data.csv file...</span>
+                    <span id="saveIndicator" class="save-indicator" style="display: none;">
+                        <i class="fas fa-circle unsaved-changes"></i>
+                        <span>Unsaved changes</span>
+                    </span>
                 </div>
                 <div class="file-info">
                     <span class="file-name" id="fileName">data.csv (default)</span>
@@ -546,6 +585,10 @@
                     <button class="btn btn-primary" onclick="addColumn()">
                         <i class="fas fa-plus"></i>
                         Add Column
+                    </button>
+                    <button id="saveCsvBtn" class="btn btn-save" onclick="saveToDataCSV()" style="display: none;">
+                        <i class="fas fa-save"></i>
+                        Save to data.csv
                     </button>
                 </div>
                 
@@ -587,8 +630,9 @@
         let workbook = null;
         let currentSheetName = '';
         let sheetNames = [];
-        let selectedCells = new Set();
         let currentFileName = 'data.csv';
+        let isDefaultFile = true;
+        let hasUnsavedChanges = false;
         
         // Load data.csv by default when page loads
         document.addEventListener('DOMContentLoaded', function() {
@@ -626,6 +670,10 @@
         function loadDefaultData() {
             document.getElementById('statusText').textContent = 'Loading default data.csv file...';
             document.getElementById('fileName').textContent = 'data.csv (default)';
+            document.getElementById('saveCsvBtn').style.display = 'none';
+            document.getElementById('saveIndicator').style.display = 'none';
+            hasUnsavedChanges = false;
+            isDefaultFile = true;
             
             fetch('data.csv')
                 .then(response => {
@@ -672,7 +720,7 @@
                     currentFileName = 'data.csv';
                     renderTable(currentSheetName);
                     
-                    document.getElementById('statusText').textContent = 'Default spreadsheet loaded from data.csv! You can now edit and download.';
+                    document.getElementById('statusText').textContent = 'Default spreadsheet loaded from data.csv! You can now edit and save.';
                     document.getElementById('controls').style.display = 'flex';
                     document.getElementById('excelTable').style.display = 'table';
                     
@@ -700,6 +748,7 @@
                     currentSheetName = sheetNames[0];
                     currentFileName = 'default_data.xlsx';
                     document.getElementById('fileName').textContent = 'default_data.xlsx (fallback)';
+                    isDefaultFile = false;
                     renderTable(currentSheetName);
                     
                     document.getElementById('statusText').textContent = 'Default spreadsheet loaded! You can now edit and download.';
@@ -716,8 +765,13 @@
             if (!file) return;
             
             currentFileName = file.name;
+            isDefaultFile = currentFileName === 'data.csv';
             document.getElementById('fileName').textContent = currentFileName;
             document.getElementById('statusBar').style.display = 'flex';
+            document.getElementById('saveCsvBtn').style.display = isDefaultFile ? 'flex' : 'none';
+            document.getElementById('saveIndicator').style.display = 'none';
+            hasUnsavedChanges = false;
+            
             showToast(`Loading ${file.name}...`, 'info');
             
             const reader = new FileReader();
@@ -736,6 +790,11 @@
                     document.getElementById('controls').style.display = 'flex';
                     document.getElementById('excelTable').style.display = 'table';
                     document.getElementById('statusText').textContent = 'Ready to edit';
+                    
+                    // Show save button if this is data.csv
+                    if (isDefaultFile) {
+                        document.getElementById('saveCsvBtn').style.display = 'flex';
+                    }
                 } catch (error) {
                     showToast(`Error loading file: ${error.message}`, 'error');
                     console.error(error);
@@ -810,6 +869,7 @@
                         this.classList.remove('cell-editing');
                         if (this.textContent !== this.oldValue) {
                             updateCellValue(rowIndex, colIndex, this.textContent);
+                            markUnsavedChanges();
                         }
                     });
                     
@@ -848,6 +908,7 @@
                         const actualColIndex = Array.from(tr.children).indexOf(td);
                         if (this.textContent !== this.oldValue) {
                             updateCellValue(actualRowIndex, actualColIndex, this.textContent);
+                            markUnsavedChanges();
                         }
                     });
                     
@@ -879,6 +940,7 @@
                         const actualColIndex = Array.from(tr.children).indexOf(td);
                         if (this.textContent !== this.oldValue) {
                             updateCellValue(actualRowIndex, actualColIndex, this.textContent);
+                            markUnsavedChanges();
                         }
                     });
                     
@@ -908,6 +970,71 @@
             worksheet[cellRef] = { v: cellValue, t: typeof cellValue === 'number' ? 'n' : 's' };
         }
         
+        // Mark that there are unsaved changes
+        function markUnsavedChanges() {
+            if (isDefaultFile && !hasUnsavedChanges) {
+                hasUnsavedChanges = true;
+                document.getElementById('saveIndicator').style.display = 'flex';
+                document.getElementById('saveCsvBtn').innerHTML = '<i class="fas fa-save"></i> Save to data.csv';
+            }
+        }
+        
+        // Save the current workbook back to data.csv
+        function saveToDataCSV() {
+            if (!workbook || !isDefaultFile) {
+                showToast('Cannot save: Not editing data.csv file', 'error');
+                return;
+            }
+            
+            // Show loading state
+            const saveBtn = document.getElementById('saveCsvBtn');
+            const originalContent = saveBtn.innerHTML;
+            saveBtn.innerHTML = '<span class="spinner"></span> Saving...';
+            saveBtn.disabled = true;
+            
+            setTimeout(() => {
+                try {
+                    // Convert workbook to CSV
+                    const worksheet = workbook.Sheets[currentSheetName];
+                    const csvContent = XLSX.utils.sheet_to_csv(worksheet);
+                    
+                    // Create a blob and download it as data.csv
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'data.csv';
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // Clean up
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                    }, 0);
+                    
+                    // Clear unsaved changes indicator
+                    hasUnsavedChanges = false;
+                    document.getElementById('saveIndicator').style.display = 'none';
+                    saveBtn.innerHTML = '<i class="fas fa-check"></i> Saved!';
+                    
+                    showToast('data.csv saved successfully! The file has been downloaded.', 'success');
+                    
+                    // Reset button after 2 seconds
+                    setTimeout(() => {
+                        saveBtn.innerHTML = originalContent;
+                        saveBtn.disabled = false;
+                    }, 2000);
+                    
+                } catch (error) {
+                    showToast(`Error saving file: ${error.message}`, 'error');
+                    saveBtn.innerHTML = originalContent;
+                    saveBtn.disabled = false;
+                }
+            }, 500);
+        }
+        
         // Add a new row
         function addRow() {
             if (!workbook) return;
@@ -930,6 +1057,7 @@
             
             // Re-render the table
             renderTable(currentSheetName);
+            markUnsavedChanges();
             showToast('New row added', 'success');
         }
         
@@ -955,6 +1083,7 @@
             
             // Re-render the table
             renderTable(currentSheetName);
+            markUnsavedChanges();
             showToast('New column added', 'success');
         }
         
@@ -1011,8 +1140,15 @@
         
         // Clear current file and reload default data.csv
         function clearFile() {
-            showToast('Clearing current file and reloading default data...', 'info');
-            loadDefaultData();
+            if (hasUnsavedChanges && isDefaultFile) {
+                if (confirm('You have unsaved changes to data.csv. Are you sure you want to reload and lose your changes?')) {
+                    showToast('Clearing current file and reloading default data...', 'info');
+                    loadDefaultData();
+                }
+            } else {
+                showToast('Clearing current file and reloading default data...', 'info');
+                loadDefaultData();
+            }
         }
         
         // Show toast notification
@@ -1052,12 +1188,13 @@
             const instructions = `
             <h3>Excel File Editor - Instructions</h3>
             <p><strong>1. Default Loading:</strong> The editor automatically loads data.csv when you open the page</p>
-            <p><strong>2. Upload a File:</strong> Click the upload area or button to select an Excel file (.xlsx, .xls, .csv)</p>
-            <p><strong>3. Edit Cells:</strong> Click on any cell to edit its content</p>
-            <p><strong>4. Add Rows/Columns:</strong> Use the buttons in the toolbar to add rows or columns</p>
-            <p><strong>5. Switch Sheets:</strong> Use the dropdown to switch between different sheets (if your file has multiple)</p>
-            <p><strong>6. Download:</strong> Click the download button to save your edited file as .xlsx</p>
-            <p><strong>7. Reload Default:</strong> Click "Reload Default Data" to go back to the original data.csv</p>
+            <p><strong>2. Edit & Save:</strong> When editing data.csv, a "Save to data.csv" button appears</p>
+            <p><strong>3. Unsaved Changes:</strong> A red dot indicates unsaved changes to data.csv</p>
+            <p><strong>4. Upload a File:</strong> Click the upload area or button to select other Excel files</p>
+            <p><strong>5. Edit Cells:</strong> Click on any cell to edit its content</p>
+            <p><strong>6. Add Rows/Columns:</strong> Use the buttons in the toolbar to add rows or columns</p>
+            <p><strong>7. Download:</strong> Click the download button to save your edited file as .xlsx</p>
+            <p><strong>8. Save data.csv:</strong> When editing data.csv, click "Save to data.csv" to download your changes</p>
             <p><strong>Note:</strong> All editing happens in your browser - no data is sent to any server</p>
             `;
             
