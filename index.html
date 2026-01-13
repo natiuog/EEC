@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel File Editor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .upload-section {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            background-color: #fafafa;
+        }
+        
+        .upload-btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .upload-btn:hover {
+            background-color: #45a049;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            margin: 0 10px;
+            background-color: #008CBA;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .btn:hover {
+            background-color: #007B9A;
+        }
+        
+        .btn.download {
+            background-color: #f44336;
+        }
+        
+        .btn.download:hover {
+            background-color: #d32f2f;
+        }
+        
+        .excel-container {
+            overflow-x: auto;
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        #excelTable {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 800px;
+        }
+        
+        #excelTable th, #excelTable td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            min-width: 100px;
+        }
+        
+        #excelTable th {
+            background-color: #f2f2f2;
+            position: sticky;
+            top: 0;
+        }
+        
+        #excelTable td {
+            background-color: white;
+        }
+        
+        #excelTable td:focus {
+            outline: 2px solid #008CBA;
+            background-color: #e6f7ff;
+        }
+        
+        .status {
+            text-align: center;
+            margin: 10px 0;
+            color: #666;
+        }
+        
+        .sheet-selector {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .sheet-selector select {
+            padding: 8px;
+            font-size: 16px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Excel File Editor</h1>
+        
+        <div class="upload-section">
+            <p>Upload an Excel file to view and edit it</p>
+            <button class="upload-btn" onclick="document.getElementById('fileInput').click()">Choose Excel File</button>
+            <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" onchange="handleFileSelect(event)">
+        </div>
+        
+        <div id="status" class="status">No file uploaded yet</div>
+        
+        <div id="controls" class="controls" style="display: none;">
+            <button class="btn" onclick="addRow()">Add Row</button>
+            <button class="btn" onclick="addColumn()">Add Column</button>
+            <button class="btn download" onclick="downloadExcel()">Download Excel</button>
+        </div>
+        
+        <div class="sheet-selector" id="sheetSelector" style="display: none;">
+            <label for="sheetDropdown">Select Sheet: </label>
+            <select id="sheetDropdown" onchange="changeSheet()"></select>
+        </div>
+        
+        <div class="excel-container">
+            <table id="excelTable" style="display: none;"></table>
+        </div>
+    </div>
+
+    <script>
+        let workbook = null;
+        let currentSheetName = '';
+        let sheetNames = [];
+        
+        // Handle file selection
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            document.getElementById('status').textContent = `Loading ${file.name}...`;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    workbook = XLSX.read(data, { type: 'array', cellEditable: true });
+                    
+                    sheetNames = workbook.SheetNames;
+                    populateSheetDropdown();
+                    
+                    currentSheetName = sheetNames[0];
+                    renderTable(currentSheetName);
+                    
+                    document.getElementById('status').textContent = `${file.name} loaded successfully!`;
+                    document.getElementById('controls').style.display = 'block';
+                    document.getElementById('sheetSelector').style.display = 'block';
+                } catch (error) {
+                    document.getElementById('status').textContent = `Error loading file: ${error.message}`;
+                    console.error(error);
+                }
+            };
+            reader.onerror = function() {
+                document.getElementById('status').textContent = 'Error reading file';
+            };
+            reader.readAsArrayBuffer(file);
+        }
+        
+        // Populate sheet dropdown
+        function populateSheetDropdown() {
+            const dropdown = document.getElementById('sheetDropdown');
+            dropdown.innerHTML = '';
+            
+            sheetNames.forEach(sheetName => {
+                const option = document.createElement('option');
+                option.value = sheetName;
+                option.textContent = sheetName;
+                dropdown.appendChild(option);
+            });
+        }
+        
+        // Change active sheet
+        function changeSheet() {
+            currentSheetName = document.getElementById('sheetDropdown').value;
+            renderTable(currentSheetName);
+        }
+        
+        // Render table from worksheet
+        function renderTable(sheetName) {
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+            
+            const table = document.getElementById('excelTable');
+            table.innerHTML = '';
+            
+            // Create header row with column letters
+            const headerRow = document.createElement('tr');
+            const range = XLSX.utils.decode_range(worksheet['!ref']);
+            for (let C = 0; C <= range.e.c; C++) {
+                const colHeader = document.createElement('th');
+                colHeader.textContent = XLSX.utils.encode_col(C); // A, B, C, etc.
+                headerRow.appendChild(colHeader);
+            }
+            table.appendChild(headerRow);
+            
+            // Create data rows
+            jsonData.forEach((row, rowIndex) => {
+                const tr = document.createElement('tr');
+                
+                for (let colIndex = 0; colIndex < row.length; colIndex++) {
+                    const td = document.createElement('td');
+                    td.contentEditable = true;
+                    td.textContent = row[colIndex];
+                    
+                    // Update cell value when edited
+                    td.addEventListener('blur', function() {
+                        updateCellValue(rowIndex, colIndex, this.textContent);
+                    });
+                    
+                    tr.appendChild(td);
+                }
+                
+                // Add empty cells if row is shorter than the longest row in the sheet
+                const expectedCells = range.e.c + 1;
+                while (tr.children.length < expectedCells) {
+                    const td = document.createElement('td');
+                    td.contentEditable = true;
+                    
+                    td.addEventListener('blur', function() {
+                        const actualRowIndex = Array.from(tr.parentNode.children).indexOf(tr) - 1; // -1 for header
+                        const actualColIndex = Array.from(tr.children).indexOf(td);
+                        updateCellValue(actualRowIndex, actualColIndex, this.textContent);
+                    });
+                    
+                    tr.appendChild(td);
+                }
+                
+                table.appendChild(tr);
+            });
+            
+            // Fill empty rows if needed
+            const expectedRows = range.e.r + 1;
+            while (table.children.length < expectedRows + 1) { // +1 for header
+                const tr = document.createElement('tr');
+                for (let colIndex = 0; colIndex < range.e.c + 1; colIndex++) {
+                    const td = document.createElement('td');
+                    td.contentEditable = true;
+                    
+                    td.addEventListener('blur', function() {
+                        const actualRowIndex = Array.from(tr.parentNode.children).indexOf(tr) - 1; // -1 for header
+                        const actualColIndex = Array.from(tr.children).indexOf(td);
+                        updateCellValue(actualRowIndex, actualColIndex, this.textContent);
+                    });
+                    
+                    tr.appendChild(td);
+                }
+                table.appendChild(tr);
+            }
+            
+            table.style.display = 'table';
+        }
+        
+        // Update cell value in the workbook
+        function updateCellValue(row, col, value) {
+            if (!workbook) return;
+            
+            const worksheet = workbook.Sheets[currentSheetName];
+            const cellRef = XLSX.utils.encode_cell({ r: row, c: col });
+            
+            // Convert value to proper type
+            let cellValue = value;
+            if (value === '') {
+                cellValue = null;
+            } else if (!isNaN(value) && value.trim() !== '') {
+                cellValue = Number(value);
+            }
+            
+            worksheet[cellRef] = { v: cellValue, t: 's' }; // Set as string type for simplicity
+        }
+        
+        // Add a new row
+        function addRow() {
+            if (!workbook) return;
+            
+            const worksheet = workbook.Sheets[currentSheetName];
+            const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+            
+            // Add a new row at the end
+            const newRow = range.e.r + 1;
+            
+            // Add empty cells for the new row
+            for (let C = 0; C <= range.e.c; C++) {
+                const cellRef = XLSX.utils.encode_cell({ r: newRow, c: C });
+                worksheet[cellRef] = { v: "", t: 's' };
+            }
+            
+            // Update range
+            range.e.r = newRow;
+            worksheet['!ref'] = XLSX.utils.encode_range(range);
+            
+            // Re-render the table
+            renderTable(currentSheetName);
+        }
+        
+        // Add a new column
+        function addColumn() {
+            if (!workbook) return;
+            
+            const worksheet = workbook.Sheets[currentSheetName];
+            const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+            
+            // Add a new column at the end
+            const newCol = range.e.c + 1;
+            
+            // Add empty cells for the new column
+            for (let R = 0; R <= range.e.r; R++) {
+                const cellRef = XLSX.utils.encode_cell({ r: R, c: newCol });
+                worksheet[cellRef] = { v: "", t: 's' };
+            }
+            
+            // Update range
+            range.e.c = newCol;
+            worksheet['!ref'] = XLSX.utils.encode_range(range);
+            
+            // Re-render the table
+            renderTable(currentSheetName);
+        }
+        
+        // Download the modified Excel file
+        function downloadExcel() {
+            if (!workbook) {
+                alert('No workbook to download!');
+                return;
+            }
+            
+            // Update the range in case new rows/columns were added
+            const worksheet = workbook.Sheets[currentSheetName];
+            const range = XLSX.utils.decode_range(worksheet['!ref']);
+            
+            // Generate the Excel file
+            const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+            
+            // Create a blob and download
+            const blob = new Blob([wbout], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = currentSheetName + '_modified.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            
+            // Clean up
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 0);
+        }
+        
+        // Initialize the page with a default workbook
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load the default CSV file
+            fetch('data.csv')
+                .then(response => response.text())
+                .then(csvText => {
+                    // Parse CSV manually to handle properly
+                    const lines = csvText.split('\n').filter(line => line.trim() !== '');
+                    const data = lines.map(line => {
+                        // Simple CSV parsing that handles commas within quoted fields
+                        const result = [];
+                        let current = '';
+                        let inQuotes = false;
+                        
+                        for (let i = 0; i < line.length; i++) {
+                            const char = line[i];
+                            
+                            if (char === '"') {
+                                inQuotes = !inQuotes;
+                            } else if (char === ',' && !inQuotes) {
+                                result.push(current);
+                                current = '';
+                            } else {
+                                current += char;
+                            }
+                        }
+                        
+                        result.push(current); // Add the last field
+                        return result;
+                    });
+                    
+                    workbook = XLSX.utils.book_new();
+                    const worksheet = XLSX.utils.aoa_to_sheet(data);
+                    XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+                    
+                    sheetNames = workbook.SheetNames;
+                    populateSheetDropdown();
+                    
+                    currentSheetName = sheetNames[0];
+                    renderTable(currentSheetName);
+                    
+                    document.getElementById('status').textContent = 'Default spreadsheet loaded from data.csv! You can now edit and download.';
+                    document.getElementById('controls').style.display = 'block';
+                    document.getElementById('sheetSelector').style.display = 'block';
+                    document.getElementById('excelTable').style.display = 'table';
+                })
+                .catch(error => {
+                    console.error('Error loading CSV file:', error);
+                    
+                    // Fallback to default data if CSV loading fails
+                    workbook = XLSX.utils.book_new();
+                    const defaultData = [
+                        ['Name', 'Age', 'City', 'Profession'],
+                        ['John Doe', 30, 'New York', 'Engineer'],
+                        ['Jane Smith', 25, 'Los Angeles', 'Designer'],
+                        ['Bob Johnson', 35, 'Chicago', 'Manager'],
+                        ['Alice Williams', 28, 'Houston', 'Analyst']
+                    ];
+                    
+                    const worksheet = XLSX.utils.aoa_to_sheet(defaultData);
+                    XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+                    
+                    sheetNames = workbook.SheetNames;
+                    populateSheetDropdown();
+                    
+                    currentSheetName = sheetNames[0];
+                    renderTable(currentSheetName);
+                    
+                    document.getElementById('status').textContent = 'Default spreadsheet loaded! You can now edit and download.';
+                    document.getElementById('controls').style.display = 'block';
+                    document.getElementById('sheetSelector').style.display = 'block';
+                    document.getElementById('excelTable').style.display = 'table';
+                });
+        });
+    </script>
+</body>
+</html>
