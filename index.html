@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel File Editor</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --primary-dark: #3a56d4;
+            --secondary-color: #7209b7;
+            --success-color: #4cc9f0;
+            --danger-color: #f72585;
+            --warning-color: #ff9e00;
+            --save-color: #2ecc71;
+            --save-dark: #27ae60;
+            --light-color: #f8f9fa;
+            --dark-color: #212529;
+            --border-color: #dee2e6;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            --shadow-hover: 0 8px 30px rgba(0, 0, 0, 0.12);
+            --gradient-primary: linear-gradient(135deg, #4361ee, #3a0ca3);
+            --gradient-save: linear-gradient(135deg, #2ecc71, #27ae60);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4edf5 100%);
+            min-height: 100vh;
+            color: var(--dark-color);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        /* Header Styles */
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-top: 20px;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .logo-icon {
+            font-size: 2.8rem;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        h1 {
+            font-size: 2.8rem;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 800;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            color: #6c757d;
+            max-width: 800px;
+            margin: 0 auto 30px;
+        }
+        
+        /* Main Card */
+        .main-card {
+            background-color: white;
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            transition: box-shadow 0.3s ease;
+            margin-bottom: 30px;
+        }
+        
+        .main-card:hover {
+            box-shadow: var(--shadow-hover);
+        }
+        
+        /* Upload Section */
+        .upload-section {
+            padding: 40px;
+            text-align: center;
+            background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .upload-area {
+            border: 3px dashed #c1c8d0;
+            border-radius: 16px;
+            padding: 40px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background-color: white;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .upload-area:hover {
+            border-color: var(--primary-color);
+            background-color: #f8fbff;
+            transform: translateY(-5px);
+        }
+        
+        .upload-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            color: var(--primary-color);
+        }
+        
+        .upload-text h3 {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+            color: var(--dark-color);
+        }
+        
+        .upload-text p {
+            color: #6c757d;
+            margin-bottom: 25px;
+            font-size: 1rem;
+        }
+        
+        .upload-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 32px;
+            background: var(--gradient-primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(67, 97, 238, 0.3);
+        }
+        
+        .upload-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(67, 97, 238, 0.4);
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        /* Status Bar */
+        .status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 30px;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1rem;
+        }
+        
+        .status i {
+            color: var(--primary-color);
+        }
+        
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .file-name {
+            background-color: white;
+            padding: 8px 16px;
+            border-radius: 50px;
+            border: 1px solid var(--border-color);
+            font-weight: 500;
+        }
+        
+        /* Controls Section */
+        .controls-section {
+            padding: 25px 30px;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .left-controls, .right-controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+        
+        .btn-success {
+            background-color: var(--success-color);
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background-color: #3bb4d8;
+            transform: translateY(-2px);
+        }
+        
+        .btn-save {
+            background: var(--gradient-save);
+            color: white;
+        }
+        
+        .btn-save:hover {
+            background: linear-gradient(135deg, #27ae60, #219653);
+            transform: translateY(-2px);
+        }
+        
+        .btn-danger {
+            background-color: var(--danger-color);
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background-color: #e01e72;
+            transform: translateY(-2px);
+        }
+        
+        .btn-delete {
+            background-color: var(--danger-color);
+            color: white;
+        }
+        
+        .btn-delete:hover {
+            background-color: #e01e72;
+            transform: translateY(-2px);
+        }
+        
+        .btn-outline {
+            background-color: transparent;
+            border: 2px solid var(--primary-color);
+            color: var(--primary-color);
+        }
+        
+        .btn-outline:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .sheet-selector {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .sheet-selector select {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 2px solid var(--border-color);
+            font-size: 1rem;
+            font-weight: 500;
+            background-color: white;
+            min-width: 180px;
+        }
+        
+        /* Excel Table Container */
+        .excel-container {
+            padding: 30px;
+            overflow-x: auto;
+            max-height: 65vh;
+        }
+        
+        #excelTable {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            min-width: 800px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        
+        #excelTable thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        #excelTable th {
+            background: var(--gradient-primary);
+            color: white;
+            padding: 16px 12px;
+            text-align: left;
+            font-weight: 600;
+            border-right: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            min-width: 120px;
+        }
+        
+        #excelTable th:last-child {
+            border-right: none;
+        }
+        
+        #excelTable td {
+            padding: 14px 12px;
+            border: 1px solid #e9ecef;
+            background-color: white;
+            transition: background-color 0.2s;
+            min-width: 120px;
+            position: relative;
+            cursor: cell;
+            user-select: none;
+        }
+        
+        #excelTable tr:nth-child(even) td {
+            background-color: #f8f9fa;
+        }
+        
+        #excelTable tr:hover td {
+            background-color: #e9f7fe;
+        }
+        
+        #excelTable td:focus {
+            outline: 2px solid var(--primary-color);
+            background-color: #e6f7ff;
+            box-shadow: inset 0 0 5px rgba(67, 97, 238, 0.2);
+        }
+        
+        /* Selected Cells */
+        #excelTable td.selected {
+            background-color: #b3e0ff !important;
+            border: 2px solid var(--primary-color) !important;
+        }
+        
+        #excelTable td.selected-range {
+            background-color: #d9edf7 !important;
+            border: 1px solid #5bc0de !important;
+        }
+        
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 25px;
+            color: #6c757d;
+            font-size: 0.95rem;
+            margin-top: 20px;
+        }
+        
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 15px;
+        }
+        
+        .footer-links a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+        
+        .footer-links a:hover {
+            color: var(--secondary-color);
+            text-decoration: underline;
+        }
+        
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            padding: 16px 24px;
+            background: var(--gradient-primary);
+            color: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 1000;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+        
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        .toast i {
+            font-size: 1.2rem;
+        }
+        
+        /* Cell Editing Indicator */
+        .cell-editing {
+            background-color: #fff8e1 !important;
+        }
+        
+        /* Loading Spinner */
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 992px) {
+            .excel-container {
+                padding: 15px;
+            }
+            
+            .controls-section {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .left-controls, .right-controls {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.2rem;
+            }
+            
+            .upload-area {
+                padding: 30px 20px;
+            }
+            
+            .upload-icon {
+                font-size: 3rem;
+            }
+            
+            .btn {
+                padding: 10px 18px;
+                font-size: 0.95rem;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .upload-section {
+                padding: 30px 20px;
+            }
+            
+            .controls-section {
+                padding: 20px;
+            }
+            
+            .excel-container {
+                padding: 10px;
+            }
+            
+            .footer-links {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+        
+        /* Animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .main-card {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        /* Save Indicator */
+        .save-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-left: 10px;
+            font-size: 0.9rem;
+            color: var(--save-color);
+            font-weight: 500;
+        }
+        
+        .unsaved-changes {
+            color: var(--warning-color);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+        
+        /* Selection Info */
+        .selection-info {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 15px;
+            font-size: 0.9rem;
+            color: #666;
+            background: #f0f0f0;
+            padding: 4px 10px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <i class="fas fa-file-excel logo-icon"></i>
+            </div>
+            <h1>Excel File Editor</h1>
+            <p class="subtitle">Upload an Excel file to view and edit it. Supports .xlsx, .xls, and .csv formats. Edit and save data.csv directly!</p>
+        </header>
+        
+        <!-- Main Card -->
+        <div class="main-card">
+            <!-- Upload Section -->
+            <div class="upload-section">
+                <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                    <div class="upload-text">
+                        <h3>Upload Excel File</h3>
+                        <p>Drag and drop your .xlsx, .xls, or .csv file here, or click to browse</p>
+                        <button class="upload-btn">
+                            <i class="fas fa-file-excel"></i>
+                            Choose Excel File
+                        </button>
+                        <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" onchange="handleFileSelect(event)">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Status Bar -->
+            <div class="status-bar" id="statusBar">
+                <div class="status">
+                    <i class="fas fa-info-circle"></i>
+                    <span id="statusText">Loading default data.csv file...</span>
+                    <span id="saveIndicator" class="save-indicator">
+                        <i class="fas fa-circle unsaved-changes"></i>
+                        <span>Unsaved changes</span>
+                    </span>
+                    <span id="selectionInfo" class="selection-info" style="display: none;">
+                        <i class="fas fa-mouse-pointer"></i>
+                        <span>0 cells selected</span>
+                    </span>
+                </div>
+                <div class="file-info">
+                    <span class="file-name" id="fileName">data.csv (default)</span>
+                    <button class="btn btn-outline" onclick="clearFile()">
+                        <i class="fas fa-times"></i>
+                        Clear
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Controls Section -->
+            <div id="controls" class="controls-section">
+                <div class="left-controls">
+                    <button class="btn btn-primary" onclick="addRow()">
+                        <i class="fas fa-plus"></i>
+                        Add Row
+                    </button>
+                    <button class="btn btn-primary" onclick="addColumn()">
+                        <i class="fas fa-plus"></i>
+                        Add Column
+                    </button>
+                    <button id="saveCsvBtn" class="btn btn-save" onclick="saveToDataCSV()">
+                        <i class="fas fa-save"></i>
+                        Save to data.csv
+                    </button>
+                    <button class="btn btn-delete" onclick="deleteSelectedCells()">
+                        <i class="fas fa-trash"></i>
+                        Delete Selected
+                    </button>
+                </div>
+                
+                <div class="right-controls">
+                    <div class="sheet-selector">
+                        <i class="fas fa-layer-group"></i>
+                        <select id="sheetDropdown" onchange="changeSheet()"></select>
+                    </div>
+                    <button class="btn btn-success" onclick="downloadExcel()">
+                        <i class="fas fa-download"></i>
+                        Download Excel
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Excel Table -->
+            <div class="excel-container">
+                <table id="excelTable"></table>
+            </div>
+        </div>
+        
+        <!-- Toast Notification -->
+        <div class="toast" id="toast">
+            <i class="fas fa-check-circle"></i>
+            <span id="toastMessage">Operation completed successfully!</span>
+        </div>
+        
+        <!-- Footer -->
+        <footer>
+            <p>Excel File Editor &copy; 2023 | All editing happens in your browser - no data is sent to any server</p>
+            <div class="footer-links">
+                <a href="#" onclick="loadDefaultData()"><i class="fas fa-redo"></i> Reload Default Data</a>
+                <a href="#" onclick="showInstructions()"><i class="fas fa-question-circle"></i> Help</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let workbook = null;
+        let currentSheetName = '';
+        let sheetNames = [];
+        let currentFileName = 'data.csv';
+        let isDefaultFile = true;
+        let hasUnsavedChanges = false;
+        let selectedCells = new Set();
+        let isSelecting = false;
+        let selectionStart = null;
+        
+        // Load data.csv by default when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDefaultData();
+            
+            // Set up drag and drop
+            const uploadArea = document.querySelector('.upload-area');
+            
+            uploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                this.style.borderColor = 'var(--primary-color)';
+                this.style.backgroundColor = '#f0f7ff';
+            });
+            
+            uploadArea.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                this.style.borderColor = '#c1c8d0';
+                this.style.backgroundColor = 'white';
+            });
+            
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.style.borderColor = '#c1c8d0';
+                this.style.backgroundColor = 'white';
+                
+                if (e.dataTransfer.files.length) {
+                    const fileInput = document.getElementById('fileInput');
+                    fileInput.files = e.dataTransfer.files;
+                    handleFileSelect({ target: { files: e.dataTransfer.files } });
+                }
+            });
+            
+            // Add keyboard shortcuts
+            document.addEventListener('keydown', function(e) {
+                // Ctrl+A to select all cells
+                if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                    e.preventDefault();
+                    selectAllCells();
+                }
+                // Delete key to clear selected cells
+                if (e.key === 'Delete' || e.key === 'Backspace') {
+                    if (selectedCells.size > 0) {
+                        e.preventDefault();
+                        deleteSelectedCells();
+                    }
+                }
+                // Escape to clear selection
+                if (e.key === 'Escape') {
+                    clearSelection();
+                }
+            });
+        });
+        
+        // Load default data.csv file
+        function loadDefaultData() {
+            document.getElementById('statusText').textContent = 'Loading default data.csv file...';
+            document.getElementById('fileName').textContent = 'data.csv (default)';
+            document.getElementById('saveIndicator').style.display = 'none';
+            document.getElementById('selectionInfo').style.display = 'none';
+            hasUnsavedChanges = false;
+            isDefaultFile = true;
+            selectedCells.clear();
+            
+            fetch('data.csv')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('data.csv file not found');
+                    }
+                    return response.text();
+                })
+                .then(csvText => {
+                    // Parse CSV manually
+                    const lines = csvText.split('\n').filter(line => line.trim() !== '');
+                    const data = lines.map(line => {
+                        // Simple CSV parsing
+                        const result = [];
+                        let current = '';
+                        let inQuotes = false;
+                        
+                        for (let i = 0; i < line.length; i++) {
+                            const char = line[i];
+                            
+                            if (char === '"') {
+                                inQuotes = !inQuotes;
+                            } else if (char === ',' && !inQuotes) {
+                                result.push(current);
+                                current = '';
+                            } else {
+                                current += char;
+                            }
+                        }
+                        
+                        result.push(current); // Add the last field
+                        return result;
+                    });
+                    
+                    // Create workbook from CSV data
+                    workbook = XLSX.utils.book_new();
+                    const worksheet = XLSX.utils.aoa_to_sheet(data);
+                    XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+                    
+                    sheetNames = workbook.SheetNames;
+                    populateSheetDropdown();
+                    
+                    currentSheetName = sheetNames[0];
+                    currentFileName = 'data.csv';
+                    renderTable(currentSheetName);
+                    
+                    document.getElementById('statusText').textContent = 'Default spreadsheet loaded from data.csv! You can now edit and save.';
+                    document.getElementById('controls').style.display = 'flex';
+                    document.getElementById('excelTable').style.display = 'table';
+                    
+                    showToast('Default data.csv loaded successfully!', 'success');
+                })
+                .catch(error => {
+                    console.error('Error loading data.csv file:', error);
+                    
+                    // Fallback to default data if CSV loading fails
+                    workbook = XLSX.utils.book_new();
+                    const defaultData = [
+                        ['Name', 'Age', 'City', 'Profession'],
+                        ['John Doe', 30, 'New York', 'Engineer'],
+                        ['Jane Smith', 25, 'Los Angeles', 'Designer'],
+                        ['Bob Johnson', 35, 'Chicago', 'Manager'],
+                        ['Alice Williams', 28, 'Houston', 'Analyst']
+                    ];
+                    
+                    const worksheet = XLSX.utils.aoa_to_sheet(defaultData);
+                    XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+                    
+                    sheetNames = workbook.SheetNames;
+                    populateSheetDropdown();
+                    
+                    currentSheetName = sheetNames[0];
+                    currentFileName = 'default_data.xlsx';
+                    document.getElementById('fileName').textContent = 'default_data.xlsx (fallback)';
+                    isDefaultFile = false;
+                    renderTable(currentSheetName);
+                    
+                    document.getElementById('statusText').textContent = 'Default spreadsheet loaded! You can now edit and download.';
+                    document.getElementById('controls').style.display = 'flex';
+                    document.getElementById('excelTable').style.display = 'table';
+                    
+                    showToast('Loaded fallback data (data.csv not found)', 'warning');
+                });
+        }
+        
+        // Handle file selection from upload
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            currentFileName = file.name;
+            isDefaultFile = currentFileName.toLowerCase() === 'data.csv';
+            document.getElementById('fileName').textContent = currentFileName;
+            document.getElementById('statusBar').style.display = 'flex';
+            document.getElementById('saveIndicator').style.display = 'none';
+            document.getElementById('selectionInfo').style.display = 'none';
+            hasUnsavedChanges = false;
+            selectedCells.clear();
+            
+            // Show/hide save button based on file name
+            if (isDefaultFile) {
+                document.getElementById('saveCsvBtn').style.display = 'flex';
+            } else {
+                document.getElementById('saveCsvBtn').style.display = 'none';
+            }
+            
+            showToast(`Loading ${file.name}...`, 'info');
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    workbook = XLSX.read(data, { type: 'array' });
+                    
+                    sheetNames = workbook.SheetNames;
+                    populateSheetDropdown();
+                    
+                    currentSheetName = sheetNames[0];
+                    renderTable(currentSheetName);
+                    
+                    showToast(`${file.name} loaded successfully!`, 'success');
+                    document.getElementById('controls').style.display = 'flex';
+                    document.getElementById('excelTable').style.display = 'table';
+                    document.getElementById('statusText').textContent = 'Ready to edit';
+                    
+                } catch (error) {
+                    showToast(`Error loading file: ${error.message}`, 'error');
+                    console.error(error);
+                }
+            };
+            reader.onerror = function() {
+                showToast('Error reading file', 'error');
+            };
+            reader.readAsArrayBuffer(file);
+        }
+        
+        // Populate sheet dropdown
+        function populateSheetDropdown() {
+            const dropdown = document.getElementById('sheetDropdown');
+            dropdown.innerHTML = '';
+            
+            sheetNames.forEach(sheetName => {
+                const option = document.createElement('option');
+                option.value = sheetName;
+                option.textContent = sheetName;
+                dropdown.appendChild(option);
+            });
+        }
+        
+        // Change active sheet
+        function changeSheet() {
+            currentSheetName = document.getElementById('sheetDropdown').value;
+            clearSelection();
+            renderTable(currentSheetName);
+            showToast(`Switched to sheet: ${currentSheetName}`, 'info');
+        }
+        
+        // Render table from worksheet
+        function renderTable(sheetName) {
+            if (!workbook) return;
+            
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+            
+            const table = document.getElementById('excelTable');
+            table.innerHTML = '';
+            
+            // Create header row with column letters
+            const headerRow = document.createElement('tr');
+            const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+            
+            // Add empty header for selection column
+            const selectAllHeader = document.createElement('th');
+            selectAllHeader.innerHTML = '<i class="fas fa-mouse-pointer"></i>';
+            selectAllHeader.style.width = '40px';
+            selectAllHeader.style.textAlign = 'center';
+            selectAllHeader.title = 'Click to select all';
+            selectAllHeader.onclick = selectAllCells;
+            headerRow.appendChild(selectAllHeader);
+            
+            // Add column headers
+            for (let C = 0; C <= range.e.c; C++) {
+                const colHeader = document.createElement('th');
+                colHeader.textContent = XLSX.utils.encode_col(C);
+                colHeader.title = `Column ${XLSX.utils.encode_col(C)}`;
+                headerRow.appendChild(colHeader);
+            }
+            table.appendChild(headerRow);
+            
+            // Create data rows
+            jsonData.forEach((row, rowIndex) => {
+                const tr = document.createElement('tr');
+                
+                // Add row selection cell
+                const rowSelectCell = document.createElement('td');
+                rowSelectCell.innerHTML = '<i class="fas fa-grip-lines"></i>';
+                rowSelectCell.style.textAlign = 'center';
+                rowSelectCell.style.cursor = 'pointer';
+                rowSelectCell.style.backgroundColor = '#f8f9fa';
+                rowSelectCell.title = 'Click to select entire row';
+                rowSelectCell.onclick = (e) => {
+                    e.stopPropagation();
+                    selectRow(rowIndex);
+                };
+                tr.appendChild(rowSelectCell);
+                
+                // Add data cells
+                for (let colIndex = 0; colIndex < row.length; colIndex++) {
+                    const td = createTableCell(rowIndex, colIndex, row[colIndex]);
+                    tr.appendChild(td);
+                }
+                
+                // Add empty cells if row is shorter than the longest row
+                const expectedCells = range.e.c + 1;
+                while (tr.children.length < expectedCells + 1) { // +1 for row selector
+                    const td = createTableCell(rowIndex, tr.children.length - 1, '');
+                    tr.appendChild(td);
+                }
+                
+                table.appendChild(tr);
+            });
+            
+            // Fill empty rows if needed
+            const expectedRows = range.e.r + 1;
+            while (table.children.length < expectedRows + 1) { // +1 for header
+                const tr = document.createElement('tr');
+                const rowIndex = table.children.length - 1;
+                
+                // Add row selection cell
+                const rowSelectCell = document.createElement('td');
+                rowSelectCell.innerHTML = '<i class="fas fa-grip-lines"></i>';
+                rowSelectCell.style.textAlign = 'center';
+                rowSelectCell.style.cursor = 'pointer';
+                rowSelectCell.style.backgroundColor = '#f8f9fa';
+                rowSelectCell.title = 'Click to select entire row';
+                rowSelectCell.onclick = (e) => {
+                    e.stopPropagation();
+                    selectRow(rowIndex - 1);
+                };
+                tr.appendChild(rowSelectCell);
+                
+                // Add empty cells
+                for (let colIndex = 0; colIndex < range.e.c + 1; colIndex++) {
+                    const td = createTableCell(rowIndex - 1, colIndex, '');
+                    tr.appendChild(td);
+                }
+                table.appendChild(tr);
+            }
+            
+            table.style.display = 'table';
+        }
+        
+        // Create a table cell with selection functionality
+        function createTableCell(row, col, value) {
+            const td = document.createElement('td');
+            td.contentEditable = true;
+            td.textContent = value;
+            td.dataset.row = row;
+            td.dataset.col = col;
+            
+            // Cell selection
+            td.addEventListener('mousedown', function(e) {
+                if (e.shiftKey && selectionStart) {
+                    // Range selection
+                    const startRow = Math.min(selectionStart.row, row);
+                    const endRow = Math.max(selectionStart.row, row);
+                    const startCol = Math.min(selectionStart.col, col);
+                    const endCol = Math.max(selectionStart.col, col);
+                    
+                    clearSelection();
+                    
+                    for (let r = startRow; r <= endRow; r++) {
+                        for (let c = startCol; c <= endCol; c++) {
+                            const cellId = `${r}-${c}`;
+                            selectedCells.add(cellId);
+                            const cell = findCell(r, c);
+                            if (cell) {
+                                cell.classList.add('selected-range');
+                            }
+                        }
+                    }
+                    updateSelectionInfo();
+                } else if (e.ctrlKey || e.metaKey) {
+                    // Add to selection
+                    e.preventDefault();
+                    const cellId = `${row}-${col}`;
+                    if (selectedCells.has(cellId)) {
+                        selectedCells.delete(cellId);
+                        this.classList.remove('selected');
+                    } else {
+                        selectedCells.add(cellId);
+                        this.classList.add('selected');
+                        selectionStart = {row, col};
+                    }
+                    updateSelectionInfo();
+                } else {
+                    // Single selection
+                    clearSelection();
+                    selectedCells.add(`${row}-${col}`);
+                    this.classList.add('selected');
+                    selectionStart = {row, col};
+                    updateSelectionInfo();
+                }
+            });
+            
+            // Update cell value when edited
+            td.addEventListener('focus', function() {
+                this.classList.add('cell-editing');
+                this.oldValue = this.textContent;
+            });
+            
+            td.addEventListener('blur', function() {
+                this.classList.remove('cell-editing');
+                if (this.textContent !== this.oldValue) {
+                    updateCellValue(row, col, this.textContent);
+                    markUnsavedChanges();
+                }
+            });
+            
+            // Handle Enter key to move to next cell
+            td.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.blur();
+                    const nextRow = this.parentElement.nextElementSibling;
+                    if (nextRow) {
+                        const cells = nextRow.querySelectorAll('td');
+                        if (cells.length > col + 1) { // +1 for row selector
+                            cells[col + 1].focus();
+                        }
+                    }
+                }
+            });
+            
+            return td;
+        }
+        
+        // Find cell by row and column
+        function findCell(row, col) {
+            const table = document.getElementById('excelTable');
+            const rows = table.querySelectorAll('tr');
+            // Skip header row (index 0)
+            if (row + 1 < rows.length) {
+                const cells = rows[row + 1].querySelectorAll('td');
+                // Skip row selector cell (index 0)
+                if (col + 1 < cells.length) {
+                    return cells[col + 1];
+                }
+            }
+            return null;
+        }
+        
+        // Select all cells
+        function selectAllCells() {
+            if (!workbook) return;
+            
+            const worksheet = workbook.Sheets[currentSheetName];
+            const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+            
+            clearSelection();
+            
+            for (let r = 0; r <= range.e.r; r++) {
+                for (let c = 0; c <= range.e.c; c++) {
+                    const cellId = `${r}-${c}`;
+                    selectedCells.add(cellId);
+                    const cell = findCell(r, c);
+                    if (cell) {
+                        cell.classList.add('selected-range');
+                    }
+                }
+            }
+            updateSelectionInfo();
+            showToast(`Selected ${selectedCells.size} cells`, 'info');
+        }
+        
+        // Select entire row
+        function selectRow(rowIndex) {
+            if (!workbook) return;
+            
+            const worksheet = workbook.Sheets[currentSheetName];
+            const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+            
+            clearSelection();
+            
+            for (let c = 0; c <= range.e.c; c++) {
+                const cellId = `${rowIndex}-${c}`;
+                selectedCells.add(cellId);
+                const cell = findCell(rowIndex, c);
+                if (cell) {
+                    cell.classList.add('selected-range');
+                }
+            }
+            updateSelectionInfo();
+            showToast(`Selected row ${rowIndex + 1}`, 'info');
+        }
+        
+        // Clear all selections
+        function clearSelection() {
+            selectedCells.clear();
+            const table = document.getElementById('excelTable');
+            if (table) {
+                const cells = table.querySelectorAll('td.selected, td.selected-range');
+                cells.forEach(cell => {
+                    cell.classList.remove('selected', 'selected-range');
+                });
+            }
+            updateSelectionInfo();
+        }
+        
+        // Update selection info display
+        function updateSelectionInfo() {
+            const selectionInfo = document.getElementById('selectionInfo');
+            if (selectedCells.size > 0) {
+                selectionInfo.style.display = 'flex';
+                selectionInfo.querySelector('span').textContent = `${selectedCells.size} cell${selectedCells.size !== 1 ? 's' : ''} selected`;
+            } else {
+                selectionInfo.style.display = 'none';
+            }
+        }
+        
+        // Delete selected cells content
+        function deleteSelectedCells() {
+            if (selectedCells.size === 0) {
+                showToast('No cells selected', 'warning');
+                return;
+            }
+            
+            if (!confirm(`Clear content of ${selectedCells.size} selected cell${selectedCells.size !== 1 ? 's' : ''}?`)) {
+                return;
+            }
+            
+            selectedCells.forEach(cellId => {
+                const [row, col] = cellId.split('-').map(Number);
+                updateCellValue(row, col, '');
+                const cell = findCell(row, col);
+                if (cell) {
+                    cell.textContent = '';
+                    cell.classList.remove('selected', 'selected-range');
+                }
+            });
+            
+            selectedCells.clear();
+            updateSelectionInfo();
+            markUnsavedChanges();
+            showToast(`Cleared ${selectedCells.size} cells`, 'success');
+        }
+        
+        // Update cell value in the workbook
+        function updateCellValue(row, col, value) {
+            if (!workbook) return;
+            
+            const worksheet = workbook.Sheets[currentSheetName];
+            const cellRef = XLSX.utils.encode_cell({ r: row, c: col });
+            
+            // Convert value to proper type
+            let cellValue = value;
+            if (value === '') {
+                cellValue = null;
+            } else if (!isNaN(value) && value.trim() !== '' && value.trim() !== '.') {
+                cellValue = Number(value);
+            }
+            
+            worksheet[cellRef] = { v: cellValue, t: typeof cellValue === 'number' ? 'n' : 's' };
+        }
+        
+        // Mark that there are unsaved changes
+        function markUnsavedChanges() {
+            if (isDefaultFile && !hasUnsavedChanges) {
+                hasUnsavedChanges = true;
+                document.getElementById('saveIndicator').style.display = 'flex';
+            }
+        }
+        
+        // Save the current workbook back to data.csv
+        function saveToDataCSV() {
+            if (!workbook || !isDefaultFile) {
+                showToast('Cannot save: Not editing data.csv file', 'error');
+                return;
+            }
+            
+            // Show loading state
+            const saveBtn = document.getElementById('saveCsvBtn');
+            const originalContent = saveBtn.innerHTML;
+            saveBtn.innerHTML = '<span class="spinner"></span> Saving...';
+            saveBtn.disabled = true;
+            
+            setTimeout(() => {
+                try {
+                    // Convert workbook to CSV
+                    const worksheet = workbook.Sheets[currentSheetName];
+                    const csvContent = XLSX.utils.sheet_to_csv(worksheet);
+                    
+                    // Create a blob and download it as data.csv
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'data.csv';
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // Clean up
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                    }, 0);
+                    
+                    // Clear unsaved changes indicator
+                    hasUnsavedChanges = false;
+                    document.getElementById('saveIndicator').style.display = 'none';
+                    saveBtn.innerHTML = '<i class="fas fa-check"></i> Saved!';
+                    
+                    showToast('data.csv saved successfully! The file has been downloaded.', 'success');
+                    
+                    // Reset button after 2 seconds
+                    setTimeout(() => {
+                        saveBtn.innerHTML = originalContent;
+                        saveBtn.disabled = false;
+                    }, 2000);
+                    
+                } catch (error) {
+                    showToast(`Error saving file: ${error.message}`, 'error');
+                    saveBtn.innerHTML = originalContent;
+                    saveBtn.disabled = false;
+                }
+            }, 500);
+        }
+        
+        // Add a new row
+        function addRow() {
+            if (!workbook) return;
+            
+            const worksheet = workbook.Sheets[currentSheetName];
+            const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+            
+            // Add a new row at the end
+            const newRow = range.e.r + 1;
+            
+            // Add empty cells for the new row
+            for (let C = 0; C <= range.e.c; C++) {
+                const cellRef = XLSX.utils.encode_cell({ r: newRow, c: C });
+                worksheet[cellRef] = { v: "", t: 's' };
+            }
+            
+            // Update range
+            range.e.r = newRow;
+            worksheet['!ref'] = XLSX.utils.encode_range(range);
+            
+            // Re-render the table
+            clearSelection();
+            renderTable(currentSheetName);
+            markUnsavedChanges();
+            showToast('New row added', 'success');
+        }
+        
+        // Add a new column
+        function addColumn() {
+            if (!workbook) return;
+            
+            const worksheet = workbook.Sheets[currentSheetName];
+            const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+            
+            // Add a new column at the end
+            const newCol = range.e.c + 1;
+            
+            // Add empty cells for the new column
+            for (let R = 0; R <= range.e.r; R++) {
+                const cellRef = XLSX.utils.encode_cell({ r: R, c: newCol });
+                worksheet[cellRef] = { v: "", t: 's' };
+            }
+            
+            // Update range
+            range.e.c = newCol;
+            worksheet['!ref'] = XLSX.utils.encode_range(range);
+            
+            // Re-render the table
+            clearSelection();
+            renderTable(currentSheetName);
+            markUnsavedChanges();
+            showToast('New column added', 'success');
+        }
+        
+        // Download the modified Excel file
+        function downloadExcel() {
+            if (!workbook) {
+                showToast('No workbook to download!', 'error');
+                return;
+            }
+            
+            // Show loading state
+            const downloadBtn = document.querySelector('.btn-success');
+            const originalContent = downloadBtn.innerHTML;
+            downloadBtn.innerHTML = '<span class="spinner"></span> Processing...';
+            downloadBtn.disabled = true;
+            
+            setTimeout(() => {
+                try {
+                    // Update the range in case new rows/columns were added
+                    const worksheet = workbook.Sheets[currentSheetName];
+                    
+                    // Generate the Excel file
+                    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+                    
+                    // Create a blob and download
+                    const blob = new Blob([wbout], { type: 'application/octet-stream' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    const fileName = currentFileName ? 
+                        currentFileName.replace(/\.[^/.]+$/, "") + '_modified.xlsx' : 
+                        'edited_spreadsheet.xlsx';
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // Clean up
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                    }, 0);
+                    
+                    showToast('File downloaded successfully!', 'success');
+                } catch (error) {
+                    showToast(`Error downloading file: ${error.message}`, 'error');
+                } finally {
+                    // Restore button state
+                    downloadBtn.innerHTML = originalContent;
+                    downloadBtn.disabled = false;
+                }
+            }, 500);
+        }
+        
+        // Clear current file and reload default data.csv
+        function clearFile() {
+            if (hasUnsavedChanges && isDefaultFile) {
+                if (confirm('You have unsaved changes to data.csv. Are you sure you want to reload and lose your changes?')) {
+                    showToast('Clearing current file and reloading default data...', 'info');
+                    loadDefaultData();
+                }
+            } else {
+                showToast('Clearing current file and reloading default data...', 'info');
+                loadDefaultData();
+            }
+        }
+        
+        // Show toast notification
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastIcon = toast.querySelector('i');
+            
+            toastMessage.textContent = message;
+            
+            // Set icon based on type
+            if (type === 'success') {
+                toastIcon.className = 'fas fa-check-circle';
+                toast.style.background = 'linear-gradient(135deg, #4CAF50, #2E7D32)';
+            } else if (type === 'error') {
+                toastIcon.className = 'fas fa-exclamation-circle';
+                toast.style.background = 'linear-gradient(135deg, #f44336, #c62828)';
+            } else if (type === 'info') {
+                toastIcon.className = 'fas fa-info-circle';
+                toast.style.background = 'linear-gradient(135deg, #2196F3, #0D47A1)';
+            } else if (type === 'warning') {
+                toastIcon.className = 'fas fa-exclamation-triangle';
+                toast.style.background = 'linear-gradient(135deg, #ff9800, #f57c00)';
+            }
+            
+            // Show toast
+            toast.classList.add('show');
+            
+            // Hide toast after 3 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+        
+        // Show instructions
+        function showInstructions() {
+            const instructions = `
+            <h3>Excel File Editor - Instructions</h3>
+            <p><strong>Cell Selection:</strong></p>
+            <p>• <strong>Single click:</strong> Select one cell</p>
+            <p>• <strong>Ctrl+Click:</strong> Add/remove cells from selection</p>
+            <p>• <strong>Shift+Click:</strong> Select range of cells</p>
+            <p>• <strong>Click row icon:</strong> Select entire row</p>
+            <p>• <strong>Click header icon:</strong> Select all cells</p>
+            <p>• <strong>Ctrl+A:</strong> Select all cells</p>
+            <p>• <strong>Delete key:</strong> Clear selected cells</p>
+            <p>• <strong>Escape:</strong> Clear selection</p>
+            <p><strong>Editing:</strong></p>
+            <p>• Click any cell to edit its content</p>
+            <p>• Press Enter to move to next cell</p>
+            <p><strong>File Operations:</strong></p>
+            <p>• "Save to data.csv" appears when editing data.csv</p>
+            <p>• Red dot indicates unsaved changes</p>
+            <p>• "Delete Selected" clears content of selected cells</p>
+            <p><strong>Note:</strong> All editing happens in your browser - no data is sent to any server</p>
+            `;
+            
+            if (confirm(instructions + "\n\nClick OK to continue.")) {
+                // User clicked OK
+            }
+        }
+    </script>
+</body>
+</html>
